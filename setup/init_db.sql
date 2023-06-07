@@ -1,5 +1,13 @@
 CREATE SCHEMA IF NOT EXISTS app;
 
+CREATE TABLE IF NOT EXISTS app.pvlog
+(
+    id BIGSERIAL PRIMARY KEY,
+    customer_id  VARCHAR,
+    timestamp TIMESTAMP,
+    pv_output DOUBLE PRECISION
+);
+
 CREATE TABLE IF NOT EXISTS app.customers
 (
     customer_id               BIGSERIAL PRIMARY KEY,
