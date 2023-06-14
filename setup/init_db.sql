@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS app.pvlog
 
 CREATE TABLE IF NOT EXISTS app.customers
 (
-    customer_id               BIGSERIAL PRIMARY KEY,
+    id               BIGSERIAL PRIMARY KEY,
     customer_name            VARCHAR          NOT NULL,
     city                      VARCHAR          NOT NULL,
     latitude                  DOUBLE PRECISION NOT NULL,
