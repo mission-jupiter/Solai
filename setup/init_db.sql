@@ -1,13 +1,5 @@
 CREATE SCHEMA IF NOT EXISTS app;
 
-CREATE TABLE IF NOT EXISTS app.pvlog
-(
-    id BIGSERIAL PRIMARY KEY,
-    customer_id  VARCHAR,
-    timestamp TIMESTAMP,
-    pv_output DOUBLE PRECISION
-);
-
 CREATE TABLE IF NOT EXISTS app.customers
 (
     id               BIGSERIAL PRIMARY KEY,
@@ -27,29 +19,32 @@ VALUES ('LondonElectrics', 'London', 31.4, 22.3),
         ('SydneySolar', 'Sydney', 11.4, 55.3);
 
 
-CREATE TABLE IF NOT EXISTS app.pv_log
-(
-    log_id                    BIGSERIAL PRIMARY KEY,
-    log_time TIMESTAMP,
-    output FLOAT,
-    customer_id BIGSERIAL REFERENCES app.customers(customer_id)
-);
-
-INSERT INTO app.pv_log ( log_time, output, customer_id)
-VALUES ('2023-04-30 10:00:00', 30, 2),
- ('2023-04-30 11:00:00', 30, 2),
- ('2023-04-30 10:00:00', 50, 1);
-
-
- CREATE TABLE IF NOT EXISTS app.forecasts
+CREATE TABLE IF NOT EXISTS app.pvlog
 (
     id                    BIGSERIAL PRIMARY KEY,
-    timestamp TIMESTAMP,
-    temp FLOAT,
-    customer_id BIGSERIAL REFERENCES app.customers(customer_id)
+    pes_id SMALLINT,
+    datetime_gmt TIMESTAMP,
+    generation_mw FLOAT,
+    customer_id BIGSERIAL REFERENCES app.customers(id)
 );
 
-INSERT INTO app.forecasts ( timestamp, temp, customer_id)
-VALUES ('2023-04-30 10:00:00', 22.2, 2),
- ('2023-04-30 11:00:00', 23.2, 2),
- ('2023-04-30 10:00:00', 18.0, 1);
+
+CREATE TABLE IF NOT EXISTS app.forecasts
+(
+    id BIGSERIAL PRIMARY KEY,
+    time TIMESTAMP,
+    temperature_2m FLOAT,
+    relativehumidity_2m FLOAT,
+    surface_pressure FLOAT,
+    windspeed_10m FLOAT,
+    windspeed_80m FLOAT,
+    windspeed_120m FLOAT,
+    windspeed_180m FLOAT,
+    winddirection_10m FLOAT,
+    winddirection_80m FLOAT,
+    winddirection_120m FLOAT,
+    winddirection_180m FLOAT,
+    direct_normal_irradiance FLOAT,
+    direct_normal_irradiance_instant FLOAT,
+    customer_id BIGSERIAL REFERENCES app.customers(id)
+);

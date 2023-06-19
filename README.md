@@ -1,10 +1,11 @@
 # HOW TO RUN THE DATABASE
 
-RUN
+## RUN
+1. `docker compose up --build`
 
-1. `docker compose build`
-2. `docker compose up -d`
-3. `docker compose exec postgres bash`
-4. `psql --username postgres postgres`
-5. `SELECT * FROM app.customers;`
 
+## Here you should see some outputs now
+For further looks into the database use:
+1. `docker compose exec postgres bash`
+2. `psql --username postgres postgres`
+3. `SELECT * FROM app.customers;`
