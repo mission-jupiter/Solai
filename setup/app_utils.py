@@ -24,7 +24,7 @@ def london_energy_api(hours:int = 48) -> pd.DataFrame():
     return df
 
 # Weather Forecast APIs
-def get_forecast(user_id:int):
+def get_forecast(user_id:int, write_to_db:bool=True) -> None:
     '''
         Takes the user_id, gets the location from the database and calls the Forecast API
     '''
@@ -38,6 +38,9 @@ def get_forecast(user_id:int):
     timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M")
     df.to_json(f"forecast-data/{timestamp}.json")
 
+    if write_to_db:
+        db = DB_Connector()
+        db.write_df(df, "app.forecasts")
 
 # Database Connectors
 class DB_Connector():
