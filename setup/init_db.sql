@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS app.forecasts
 (
     id BIGSERIAL PRIMARY KEY,
     time TIMESTAMP,
+    api_called_at VARCHAR,
+    hour INT,
     temperature_2m FLOAT,
     relativehumidity_2m FLOAT,
     surface_pressure FLOAT,
@@ -48,3 +50,7 @@ CREATE TABLE IF NOT EXISTS app.forecasts
     direct_normal_irradiance_instant FLOAT,
     customer_id BIGSERIAL REFERENCES app.customers(id)
 );
+
+COMMENT ON COLUMN app.forecasts.api_called_at IS 'The time we called the Weather API to get the weather forecast';
+COMMENT ON COLUMN app.forecasts.hour IS 'The hour of the day, the forecast is for';
+COMMENT ON COLUMN app.forecasts.time IS 'The time the forecast wants to predict';

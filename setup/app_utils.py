@@ -9,6 +9,7 @@ import psycopg2.extras as extras
 from io import StringIO
 import os
 from glob import glob
+from pathlib import Path
 
 # PV APIs
 def london_energy_api(hours:int = 48) -> pd.DataFrame():
@@ -47,7 +48,7 @@ class DB_Connector():
     def __init__(self):
         # Connection has to be closes manually at the end connection.close()
         self.connection = psycopg2.connect(
-                host="pgdb",
+                host="localhost",
                 port="5432",
                 database="postgres",
                 user="postgres",
@@ -104,9 +105,20 @@ def write_forecasts_to_db(user:int):
     path = f"./weather_forecasts/{user}/"
     files = glob(os.path.join(path, "*.json"))
     print(files)
-    df_generator = (pd.read_json(f) for f in files)
-    df = pd.concat(df_generator, ignore_index=True)
+
+    def df_generator():
+        for f in files:
+            df = pd.read_json(f)
+            df["time"] = pd.to_datetime(df["time"])
+            df["api_called_at"] = datetime.strptime(Path(f).stem, "%Y-%m-%d_%H:%M")
+            df["hour"] = df["time"].dt.hour
+            # Now remove all not forecasting timestamps that are smaller than the query time.
+            df = df.loc[df["time"] >= df["api_called_at"]]
+            yield df
+
+    df = pd.concat(df_generator(), ignore_index=True)
     df["customer_id"] = user
+
 
     # Now we can load the data into the database
     d = DB_Connector()

@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 import setup.app_utils as au
-
+import time
+from datetime import datetime
 
 def test_db():
     db = au.DB_Connector()
@@ -13,6 +14,8 @@ def init_tables():
     au.write_forecasts_to_db(1)
     au.write_pvdata_to_db(1)
 
+
 if __name__=="__main__":
+    print("test")
     init_tables()
     test_db()

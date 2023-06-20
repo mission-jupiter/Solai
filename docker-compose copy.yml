@@ -16,6 +16,15 @@ services:
     networks:
       - app_network
 
+  solai:
+    build: .
+    volumes:
+      - .:/app
+    networks:
+      - app_network
+    depends_on:
+      - pgdb
+
 volumes:
   postgres_data: {}
 
