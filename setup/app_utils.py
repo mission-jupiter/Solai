@@ -10,6 +10,7 @@ from io import StringIO
 import os
 from glob import glob
 from pathlib import Path
+import json
 
 # PV APIs
 def london_energy_api(hours:int = 48) -> pd.DataFrame():
@@ -25,23 +26,29 @@ def london_energy_api(hours:int = 48) -> pd.DataFrame():
     return df
 
 # Weather Forecast APIs
-def get_forecast(user_id:int, write_to_db:bool=True) -> None:
+def get_forecast(user_id:int, write_to_db:bool=True, write_to_json:bool=True) -> pd.DataFrame:
     '''
         Takes the user_id, gets the location from the database and calls the Forecast API
     '''
     d = DB_Connector()
-    df = d.read(f"SELECT lat, lon from app.users where id={user_id} LIMIT 1;")[0]
-    lat = df["lat"]
-    lon = df["lon"]
+    df = d.read_to_df(f"SELECT * from app.customers where id={user_id} LIMIT 1;")
+    lat = df.loc[1, "latitude"]
+    lon = df.loc[1, "longitude"]
     api = api = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,relativehumidity_2m,surface_pressure,windspeed_10m,winddirection_10m,is_day,terrestrial_radiation&current_weather=true&forecast_days=3&timezone=auto"
-    result = requests.get(api).content
-    df = pd.read_csv(io.StringIO(result.decode('utf-8')))
+    
+    result = requests.get(api).text
+    forecast = pd.DataFrame(json.loads(result).get("hourly"))
     timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M")
-    df.to_json(f"forecast-data/{timestamp}.json")
+
+    if write_to_json:
+        forecast.to_json(f"weather_forecasts/{user_id}/{timestamp}.json")
 
     if write_to_db:
         db = DB_Connector()
-        db.write_df(df, "app.forecasts")
+        df["api_called_at"] = timestamp
+        db.write_df(_forecast_preprocessing(forecast), "app.forecasts")
+
+    return forecast
 
 # Database Connectors
 class DB_Connector():
@@ -89,6 +96,10 @@ class DB_Connector():
             return cur.fetchall()
 
     def read_to_df(self, query:str) -> pd.DataFrame:
+        '''
+        Always take the whole dataframe or at least the Primary key with it,
+        because the first column will be taken as index of the DataFrame
+        '''
         # closes the cursor after usage
         print("Execute Read")
         with self.connection.cursor() as cur:
@@ -99,7 +110,14 @@ class DB_Connector():
             df.columns = cols
             df = df.set_index(df.columns[0])
             return df
-        
+
+def _forecast_preprocessing(df:pd.DataFrame) -> pd.DataFrame:
+    df["time"] = pd.to_datetime(df["time"])
+    df["hour"] = df["time"].dt.hour
+    # Now remove all not forecasting timestamps that are smaller than the query time.
+    df = df.loc[df["time"] >= df["api_called_at"]]
+    return df
+
 def write_forecasts_to_db(user:int):
 
     path = f"./weather_forecasts/{user}/"
@@ -109,12 +127,8 @@ def write_forecasts_to_db(user:int):
     def df_generator():
         for f in files:
             df = pd.read_json(f)
-            df["time"] = pd.to_datetime(df["time"])
             df["api_called_at"] = datetime.strptime(Path(f).stem, "%Y-%m-%d_%H:%M")
-            df["hour"] = df["time"].dt.hour
-            # Now remove all not forecasting timestamps that are smaller than the query time.
-            df = df.loc[df["time"] >= df["api_called_at"]]
-            yield df
+            yield _forecast_preprocessing(df)
 
     df = pd.concat(df_generator(), ignore_index=True)
     df["customer_id"] = user
