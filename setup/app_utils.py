@@ -12,6 +12,14 @@ from glob import glob
 from pathlib import Path
 import json
 from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn import preprocessing
+import pickle
+from sklearn.feature_selection import chi2
+import numpy as np
+from typing import Tuple
 
 # PV APIs
 def london_energy_api(hours:int = 48) -> pd.DataFrame():
@@ -39,7 +47,11 @@ def get_forecast(user_id:int, write_to_db:bool=True, write_to_json:bool=True) ->
     
     result = requests.get(api).text
     forecast = pd.DataFrame(json.loads(result).get("hourly"))
+    forecast["time"] = pd.to_datetime(forecast["time"])
     timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M")
+    #breakpoint()
+    # Only take forecasts that are in the future
+    forecast = forecast.loc[forecast["time"] > datetime.now()]
 
     if write_to_json:
         forecast.to_json(f"weather_forecasts/{user_id}/{timestamp}.json")
@@ -123,7 +135,6 @@ def write_forecasts_to_db(user:int):
 
     path = f"./weather_forecasts/{user}/"
     files = glob(os.path.join(path, "*.json"))
-    print(files)
     def df_generator():
         for f in files:
             df = pd.read_json(f)
@@ -133,6 +144,10 @@ def write_forecasts_to_db(user:int):
     df = pd.concat(df_generator(), ignore_index=True)
     df["customer_id"] = user
 
+    # Now we filter out duplicates of the time column
+    df = df.drop_duplicates(subset="time")
+    # Now we drop rows that contain missing data
+    df.dropna(axis=1, inplace=True)
 
     # Now we can load the data into the database
     d = DB_Connector()
@@ -147,7 +162,7 @@ def write_pvdata_to_db(user:int):
     d.write_df(df, "app.pvlog")
 
 
-def get_model():
+def get_model() -> None:
     db = DB_Connector()
     forecasts_data = db.read_to_df("SELECT * from app.forecasts;")
     forecasts_data = forecasts_data.rename(columns={'api_called_at': 'merge_time'})
@@ -172,11 +187,65 @@ def get_model():
                      'direct_normal_irradiance_instant']]
 
     y = merged_data['generation_mw']
-
+    breakpoint()
     model = LinearRegression()
     pred_model = model.fit(x, y)
     return pred_model
 
+def _create_training_data() -> pd.DataFrame:
+    '''
+    This function is used to create the training and testings data for the
+    ML model
+    '''
+    db = DB_Connector()
+    forecasts_data = db.read_to_df("SELECT * from app.forecasts;")
+    forecasts_data = forecasts_data.drop(columns=["customer_id","hour"])
+    pv_data = db.read_to_df("SELECT * from app.pvlog;")
+    pv_data = pv_data.drop(columns=["customer_id", "pes_id"])
+
+    merged_data = pd.merge(forecasts_data, pv_data, left_on="time", right_on="datetime_gmt", how="inner")
+    merged_data = merged_data.drop(columns=["datetime_gmt"])
+    merged_data = merged_data[["direct_normal_irradiance_instant", "generation_mw"]]
+
+    return merged_data
+
+
+def train_model():
+
+    df =  _create_training_data()
+    x = df["direct_normal_irradiance_instant"].to_numpy().reshape(-1,1)
+    y = df["generation_mw"].to_numpy().reshape(-1,1)
+    # creating train and test sets
+    X_train, X_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=21)
+    
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    predictions = model.predict(X_test)
+
+    # Evaluate the model
+    # model evaluation
+    print("Mean Squared Error", mean_squared_error(y_test, predictions))
+    #print("Mean Absolute Error", mean_absolute_error(y_test, predictions))
+    print("Model Coefs", model.coef_)
+    # saving the model to disk
+    pickle.dump(model, open("trained_model.pickle", "wb"))
+    #scores, pvalues = chi2(X_train, y_train) 
+    #print("Pvalues:", pvalues)
+
+
+def predict(user_id:int) -> pd.DataFrame:
+    data_x = get_forecast(user_id=user_id,  write_to_db=False, write_to_json=False)
+    time = data_x["time"]
+
+    x = data_x["direct_normal_irradiance_instant"].to_numpy().reshape(-1,1)
+    
+    model = pickle.load(open("trained_model.pickle", "rb"))
+    pred = model.predict(x)
+    df = pd.DataFrame(time, columns=["time"]).set_index("time")
+    df["forecast"] = x
+    df["pred"] = pred
+    return df
 
 def filter_forecast(df) -> pd.DataFrame:
     df = df[['temperature_2m',

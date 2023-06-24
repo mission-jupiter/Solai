@@ -47,9 +47,7 @@ CREATE TABLE IF NOT EXISTS app.forecasts
     winddirection_120m FLOAT,
     winddirection_180m FLOAT,
     direct_normal_irradiance FLOAT,
-    is_day DOUBLE PRECISION,
     direct_normal_irradiance_instant FLOAT,
-    terrestrial_radiation FLOAT,
     customer_id BIGSERIAL REFERENCES app.customers(id)
 );
 
