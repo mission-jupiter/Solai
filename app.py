@@ -3,6 +3,7 @@ import numpy as np
 import setup.app_utils as au
 import time
 from datetime import datetime
+from sklearn.linear_model import LinearRegression
 
 def test_db():
     db = au.DB_Connector()
@@ -14,9 +15,17 @@ def init_tables():
     au.write_forecasts_to_db(1)
     au.write_pvdata_to_db(1)
 
+def pred():
+    data_x = au.get_forecast(user_id=1,  write_to_db=False, write_to_json=False)
+    data_x = data_x.drop(columns=['time'])
+    print(data_x)
+    model = au.get_model()
+    pred = model.predict(data_x)
+    print(pred)
+
 if __name__=="__main__":
     #print("test")
     init_tables()
-    au.london_energy_api()
-    #test_db()
-    print(au.get_forecast(user_id=1,  write_to_db=False, write_to_json=True))
+    test_db()
+    pred()
+    #print(au.get_forecast(user_id=1,  write_to_db=False, write_to_json=True))
