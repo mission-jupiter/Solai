@@ -11,6 +11,7 @@ import os
 from glob import glob
 from pathlib import Path
 import json
+from sklearn.linear_model import LinearRegression
 
 # PV APIs
 def london_energy_api(hours:int = 48) -> pd.DataFrame():
@@ -34,7 +35,7 @@ def get_forecast(user_id:int, write_to_db:bool=True, write_to_json:bool=True) ->
     df = d.read_to_df(f"SELECT * from app.customers where id={user_id} LIMIT 1;")
     lat = df.loc[1, "latitude"]
     lon = df.loc[1, "longitude"]
-    api = api = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,relativehumidity_2m,surface_pressure,windspeed_10m,winddirection_10m,is_day,terrestrial_radiation&current_weather=true&forecast_days=3&timezone=auto"
+    api = api = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,relativehumidity_2m,surface_pressure,windspeed_10m,windspeed_80m,windspeed_120m,windspeed_180m,winddirection_10m,winddirection_80m,winddirection_120m,winddirection_180m,direct_normal_irradiance,direct_normal_irradiance_instant&forecast_days=3&timezone=auto"
     
     result = requests.get(api).text
     forecast = pd.DataFrame(json.loads(result).get("hourly"))
@@ -149,3 +150,51 @@ def write_pvdata_to_db(user:int):
     # Now we can load the data into the database
     d = DB_Connector()
     d.write_df(df, "app.pvlog")
+
+def get_model():
+    db = DB_Connector()
+    forecasts_data = db.read_to_df("SELECT * from app.forecasts;")
+    forecasts_data = forecasts_data.rename(columns={'api_called_at': 'merge_time'})
+    pv_data = db.read_to_df("SELECT * from app.pvlog;")
+    pv_data = pv_data.rename(columns={'datetime_gmt': 'merge_time'})
+    pv_data['merge_time'] = pv_data['merge_time'].astype(str)
+
+    merged_data = pd.merge(forecasts_data, pv_data, on='merge_time')
+
+    x = merged_data[['temperature_2m',
+                     'relativehumidity_2m',
+                     'surface_pressure',
+                     'windspeed_10m',
+                     'windspeed_80m',
+                     'windspeed_120m',
+                     'windspeed_180m',
+                     'winddirection_10m',
+                     'winddirection_80m',
+                     'winddirection_120m',
+                     'winddirection_180m',
+                     'direct_normal_irradiance',
+                     'direct_normal_irradiance_instant']]
+
+    y = merged_data['generation_mw']
+
+    model = LinearRegression()
+    pred_model = model.fit(x, y)
+    return pred_model
+
+
+def filter_forecast(df) -> pd.DataFrame:
+    df = df[['temperature_2m',
+            'relativehumidity_2m',
+             'surface_pressure',
+             'windspeed_10m',
+             'windspeed_80m',
+             'windspeed_120m',
+             'windspeed_180m',
+             'winddirection_10m',
+             'winddirection_80m',
+             'winddirection_120m',
+             'winddirection_180m',
+             'direct_normal_irradiance',
+             'direct_normal_irradiance_instant']]
+
+    return df
