@@ -21,8 +21,8 @@ def london_energy_api(hours:int = 48) -> pd.DataFrame():
     endtime = datetime.now()
     api = f"https://api.solar.sheffield.ac.uk/pvlive/api/v4/pes/12?start={starttime}&end={endtime}&data_format=csv"
     result = requests.get(api).content
-
     df = pd.read_csv(io.StringIO(result.decode('utf-8')))
+    df["customer_id"] = "1"
     return df
 
 # Weather Forecast APIs
@@ -123,7 +123,6 @@ def write_forecasts_to_db(user:int):
     path = f"./weather_forecasts/{user}/"
     files = glob(os.path.join(path, "*.json"))
     print(files)
-
     def df_generator():
         for f in files:
             df = pd.read_json(f)
@@ -139,13 +138,9 @@ def write_forecasts_to_db(user:int):
     d.write_df(df, "app.forecasts")
 
 def write_pvdata_to_db(user:int):
-
-    path = f"./pv_data/{user}/"
-    files = glob(os.path.join(path, "*.json"))
-    print(files)
-    df_generator = (pd.read_json(f) for f in files)
-    df = pd.concat(df_generator, ignore_index=True)
-    df["customer_id"] = user
+    df = london_energy_api(8760)
+    filepath = f"./pv_data/{user}/historical_pv_data.json"
     # Now we can load the data into the database
     d = DB_Connector()
+    df.to_json(filepath)
     d.write_df(df, "app.pvlog")

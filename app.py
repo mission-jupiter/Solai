@@ -15,7 +15,8 @@ def init_tables():
     au.write_pvdata_to_db(1)
 
 if __name__=="__main__":
-    print("test")
+    #print("test")
     init_tables()
-    test_db()
+    au.london_energy_api()
+    #test_db()
     print(au.get_forecast(user_id=1,  write_to_db=False, write_to_json=True))
