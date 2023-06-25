@@ -14,7 +14,7 @@ services:
     volumes:
       - ./backend/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     networks:
-      - app_network
+      - solainet
 
   backend:
     build:
@@ -23,7 +23,7 @@ services:
     volumes:
       - .:/app
     networks:
-      - app_network
+      - solainet
     depends_on:
       - pgdb
 
@@ -34,13 +34,13 @@ services:
     volumes:
       - .:/app
     networks:
-      - app_network
+      - solainet
     depends_on:
+      - pgdb
       - backend
-    command: "1"
-    
+
 volumes:
   postgres_data: {}
 
 networks:
-  app_network: {}
+  solainet:

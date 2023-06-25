@@ -2,7 +2,7 @@ FROM python:3.10-slim-buster
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY backend/ /app
-COPY run_prediction.py /app
-COPY trained_model.pickle /app
-ENTRYPOINT [ "python3", "run_prediction.py"]
+COPY backend /app/backend
+COPY run_prediction.py .
+COPY trained_model.pickle .
+ENTRYPOINT ["python3", "run_prediction.py"]
