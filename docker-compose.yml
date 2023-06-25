@@ -12,10 +12,33 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - ./setup/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ./backend/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     networks:
       - app_network
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile-backend
+    volumes:
+      - .:/app
+    networks:
+      - app_network
+    depends_on:
+      - pgdb
+
+  solai:
+    build:
+      context: .
+      dockerfile: Dockerfile-prediction
+    volumes:
+      - .:/app
+    networks:
+      - app_network
+    depends_on:
+      - backend
+    command: "1"
+    
 volumes:
   postgres_data: {}
 
