@@ -42,6 +42,7 @@ For the project you need to install and run your local docker engine.
 1. `docker compose up -d --build pgdb backend`
 
 ## Predict the PV Output
+Replace 1 with your user_id. Right now there is just user=1 usable
 1. `docker compose build solai`
 2. `docker compose run --rm solai 1`
 
