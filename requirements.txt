@@ -1,6 +1,4 @@
 requests
-pydantic
-datetime
 pandas
 psycopg2-binary
 scikit-learn

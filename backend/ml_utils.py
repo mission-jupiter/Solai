@@ -1,41 +1,31 @@
-import requests
-import pydantic
-from datetime import datetime, timedelta
-from typing import Literal,List,Union
 import pandas as pd
-import io
-import psycopg2
-import psycopg2.extras as extras
-from io import StringIO
-import os
-from glob import glob
-from pathlib import Path
-import json
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-from sklearn import preprocessing
+from sklearn.metrics import mean_squared_error
 import pickle
-from sklearn.feature_selection import chi2
-import numpy as np
-from typing import Tuple
 from backend.db_utils import DB_Connector
 from backend.api_utils import Weather_API
 
 
+def train_model(eval: bool = False):
+    """train_model Trains the Linear Regression Model for the SolAI service
 
+    Args:
+        eval (bool, optional): Defines if we want to evaluate the model after
+        training. Defaults to False.
+    """
 
-def train_model(eval:bool = False):
-
-    df =  _create_training_data()
-    x = df["direct_normal_irradiance_instant"].to_numpy().reshape(-1,1)
-    y = df["generation_mw"].to_numpy().reshape(-1,1)
+    # We just take one independend variable here. The normal irradiance instant
+    # shows the highest correlation score and is sufficient for a first MVP
+    df = _create_training_data()
+    x = df["direct_normal_irradiance_instant"].to_numpy().reshape(-1, 1)
+    y = df["generation_mw"].to_numpy().reshape(-1, 1)
 
     # creating train and test sets
     X_train, X_test, y_train, y_test = train_test_split(
-        x, y, test_size=0.2, random_state=21)
-    
+        x, y, test_size=0.2, random_state=21
+    )
+
     model = LinearRegression()
     model.fit(X_train, y_train)
 
@@ -46,43 +36,70 @@ def train_model(eval:bool = False):
         _eval_model(model, X_test, y_test)
 
 
-def predict(user_id:int) -> pd.DataFrame:
+def predict(user_id: int) -> pd.DataFrame:
+    """predict uses the trained_model to predict for a specific user_id
+
+    Args:
+        user_id (int): unique user identifier
+
+    Returns:
+        pd.DataFrame: resulting DataFrame that contains the predicted time,
+        the weather forecasts and the predicted pv output
+    """
     w = Weather_API(user_id)
     data = w.get()
     time = data["time"]
 
-    x = data["direct_normal_irradiance_instant"].to_numpy().reshape(-1,1)
-    
+    x = data["direct_normal_irradiance_instant"].to_numpy().reshape(-1, 1)
+
     model = pickle.load(open("trained_model.pickle", "rb"))
     pred = model.predict(x)
 
     df = pd.DataFrame(time, columns=["time"]).set_index("time")
     df["forecast"] = x
     df["pred"] = pred
-    
+
     return df
 
 
 def _create_training_data() -> pd.DataFrame:
-    '''
-    This function is used to create the training and testings data for the
-    ML model
-    '''
+    """_create_training_data Helper function to read in the database content
+    and prepare them for training.
+
+    Returns:
+        pd.DataFrame: merged Dataframe
+    """
+
     db = DB_Connector()
 
     forecasts_data = db.read_to_df("SELECT * from app.forecasts;")
-    
+
     pv_data = db.read_to_df("SELECT * from app.pvlog;")
     pv_data = pv_data.drop(columns=["pes_id"])
 
-    merged_data = pd.merge(forecasts_data, pv_data, left_on=["time","customer_id"], right_on=["datetime_gmt", "customer_id"], how="inner")
-    merged_data = merged_data[["direct_normal_irradiance_instant", "generation_mw"]]
+    merged_data = pd.merge(
+        forecasts_data,
+        pv_data,
+        left_on=["time", "customer_id"],
+        right_on=["datetime_gmt", "customer_id"],
+        how="inner",
+    )
+    merged_data = merged_data[["direct_normal_irradiance_instant",
+                               "generation_mw"]]
     return merged_data
 
+
 def _eval_model(model, X_test, y_test):
+    """_eval_model Performs a Mean Squared Error Evaluation for the given model
+
+    Args:
+        model (_type_): given model that needs to contain a .predict method
+        X_test (_type_): numpy array with dimensions (n,m).
+        Where m is the number of independent variables the model was trained on
+        y_test (_type_): numpy array with dimensions(n,m)
+    """
     predictions = model.predict(X_test)
     # Evaluate the model
-    # model evaluation
     print("Mean Squared Error", mean_squared_error(y_test, predictions))
-    #print("Mean Absolute Error", mean_absolute_error(y_test, predictions))
+    # print("Mean Absolute Error", mean_absolute_error(y_test, predictions))
     print("Model Coefs", model.coef_)
